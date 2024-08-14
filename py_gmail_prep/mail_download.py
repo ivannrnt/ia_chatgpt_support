@@ -63,11 +63,15 @@ def main():
             break
         else:
             for message in messages:
-                msg = service.users().messages().get(userId='me', id=message['id']).execute()
-                ok += 1
-                print(ok, msg['id'])
-                with open(os.path.join("emails", f"{msg['id']}.json"), "w") as f:
-                    json.dump(msg, f)
+                filename = os.path.join("emails", f"{message['id']}.json")
+                if not os.path.exists(filename):
+                    msg = service.users().messages().get(userId='me', id=message['id']).execute()
+                    ok += 1
+                    print(ok, msg['id'])
+                    with open(filename, "w") as f:
+                        json.dump(msg, f)
+                else:
+                    print("skipped", message['id'])
 
         if('nextPageToken' in results or next_page_token==''):
             next_page_token = results['nextPageToken']
