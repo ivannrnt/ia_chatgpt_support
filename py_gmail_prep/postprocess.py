@@ -7,6 +7,7 @@ import datetime
 from email import message_from_file
 from email.message import EmailMessage
 
+from bs4 import BeautifulSoup
 
 DEBUG = False
 
@@ -26,6 +27,17 @@ def get_message_body(msg):
         return base64.urlsafe_b64decode(msg['payload']['body']['data'].encode('ASCII')).decode('utf-8')
     else:
         return get_message_part(msg['payload'])
+
+
+def normalize_body(body_html):
+    soup = BeautifulSoup(body_html, features="html.parser")
+
+    # remove html tags
+    for script in soup(["script", "style"]):
+        script.extract()
+
+    plain_text = soup.get_text()
+    return plain_text
 
 
 def get_message_part(parts):
@@ -79,7 +91,7 @@ def parse_gmail(file_path):
             return
 
         # limpiar el cuerpo del mensaje para eliminar el texto citado
-        clean_body = remove_cited_text(msg_str.strip())
+        clean_body = normalize_body(remove_cited_text(msg_str.strip()))
 
         timestamp = datetime.datetime.fromtimestamp(float(msg['internalDate'])/1000.).strftime('%Y%m%d_%H%M%S')
         filename = f"{timestamp}_{msg['historyId']}_{msg['id']}.eml"
