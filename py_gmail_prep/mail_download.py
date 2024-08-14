@@ -2,7 +2,6 @@ import os.path
 import sys
 import base64
 import json
-from email.message import EmailMessage
 import base64
 
 import google.auth
@@ -15,49 +14,6 @@ from googleapiclient.discovery import build
 # configuración de los permisos de la API de Gmail
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 LABEL = sys.argv[1]
-
-
-def get_message_body(msg):
-    print(msg['id'])
-    if 'data' in msg['payload']['body']:
-        return base64.urlsafe_b64decode(msg['payload']['body']['data'].encode('ASCII')).decode('utf-8')
-    else:
-        return get_message_part(msg['payload'])
-
-
-def get_message_part(parts):
-        # si el mensaje es multipart, recorrer las partes y extraer el texto plano
-        for part in parts.get('parts', []):
-            print(part['mimeType'])
-            if part['mimeType'] == 'text/plain' and 'data' in part['body']:
-                return base64.urlsafe_b64decode(part['body']['data'].encode('ASCII')).decode('utf-8')
-            if part['mimeType'] == 'multipart/alternative':
-                # recursivamente buscar la parte de texto:
-                return get_message_part(part)
-
-
-def get_message_headers(msg):
-    # armar un diccionario con los encabezados, filtrando los interesantes:
-    headers = {}
-    for header in msg["payload"]["headers"]:
-        if header["name"] in ("In-Reply-To", "From", "Date", "Message-ID", "Subject", "To", "Return-Path"):
-            headers[header["name"]] = header["value"]
-    return headers
-
-
-def create_rfc822_message(headers, body):
-    # crear un nuevo mensaje de correo
-    msg = EmailMessage()
-
-    # agregar los encabezados
-    for key, value in headers.items():
-        if key.lower() not in ['content-transfer-encoding', 'content-type']:
-            msg[key] = value
-    # agregar el cuerpo del mensaje
-    msg.set_content(body)
-
-    # devolver el mensaje como una cadena en formato RFC822
-    return msg.as_string()
 
 
 def main():
@@ -97,6 +53,7 @@ def main():
     
     # llamada a la API para obtener los mensajes con la etiqueta
     next_page_token = ""
+    ok = 0
     while True:
         results = service.users().messages().list(userId='me', labelIds=[label_id],  maxResults=100, pageToken=next_page_token).execute()
         messages = results.get('messages', [])
@@ -107,20 +64,10 @@ def main():
         else:
             for message in messages:
                 msg = service.users().messages().get(userId='me', id=message['id']).execute()
-                with open(f"emails/{msg['id']}.json", "w") as f:
+                ok += 1
+                print(ok, msg['id'])
+                with open(os.path.join("emails", f"{msg['id']}.json"), "w") as f:
                     json.dump(msg, f)
-                msg_str = get_message_body(msg)
-                if msg_str:
-                    print(msg_str) 
-                    headers = get_message_headers(msg)
-                    # ignorar mensajes sin publicar
-                    if "Google Groups: mensaje pendiente" in headers["Subject"]:
-                        continue
-                    email = create_rfc822_message(headers, msg_str)
-                    with open(f"emails/{msg['id']}.eml", "w") as f:
-                        f.write(email)
-                else:
-                    print(f'No se pudo extraer el cuerpo del mensaje con ID: {message["id"]}')
 
         if('nextPageToken' in results or next_page_token==''):
             next_page_token = results['nextPageToken']
