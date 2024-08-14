@@ -108,7 +108,8 @@ def parse_gmail(file_path):
 def remove_cited_text(body):
     # lista de posibles indicadores de texto citado
     citation_markers = [
-        "On ", "En ", "Le ", "El ", "wrote:", "escribió:", "escribio:", "ha scritto:", "a écrit:", "schrieb:"
+        "On ", "En ", "Le ", "El ", "wrote:", "escribió:", "escribio:", "ha scritto:", "a écrit:", "schrieb:",
+        "Has recibido este mensaje porque estás suscrito al grupo",
     ]
     # dividir el cuerpo en líneas
     lines = body.splitlines()
