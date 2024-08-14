@@ -22,18 +22,21 @@ def get_message_images(service, msg, folder):
             if filename:
                 os.makedirs(folder, exist_ok=True)
                 print("found", filename)
-                if 'data' in part['body']:
-                    data = part['body']['data']
+                destination = os.path.join(folder, filename)
+                if not os.path.exists(destination):
+                    if 'data' in part['body']:
+                        data = part['body']['data']
+                    else:
+                        attach_id = part['body']['attachmentId']
+                        attach = service.users().messages().attachments().get(userId='me', messageId=msg['id'], id=attach_id).execute()
+                        data = attach['data']
+                    bin_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
+                    print(len(bin_data))
+
+                    with open(destination, 'wb') as f:
+                        f.write(bin_data)
                 else:
-                    attach_id = part['body']['attachmentId']
-                    attach = service.users().messages().attachments().get(userId='me', messageId=msg['id'], id=attach_id).execute()
-                    data = attach['data']
-                bin_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
-                print(len(bin_data))
-
-                with open(os.path.join(folder, filename), 'wb') as f:
-                    f.write(bin_data)
-
+                    print("skipped", destination)
 
 def parse_gmail(service, file_path):
 
