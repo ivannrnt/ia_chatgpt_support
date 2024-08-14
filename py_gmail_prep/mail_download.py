@@ -29,12 +29,11 @@ def get_message_part(parts):
         # si el mensaje es multipart, recorrer las partes y extraer el texto plano
         for part in parts.get('parts', []):
             print(part['mimeType'])
-            if part['mimeType'] == 'text/plain':
+            if part['mimeType'] == 'text/plain' and 'data' in part['body']:
                 return base64.urlsafe_b64decode(part['body']['data'].encode('ASCII')).decode('utf-8')
             if part['mimeType'] == 'multipart/alternative':
                 # recursivamente buscar la parte de texto:
                 return get_message_part(part)
-            breakpoint()
 
 
 def get_message_headers(msg):
@@ -73,6 +72,9 @@ def main():
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+            import webbrowser
+            chrome_path="C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+            webbrowser.register('chrome', None,webbrowser.BackgroundBrowser(chrome_path))
             creds = flow.run_local_server(port=0, browser='chrome')  # Asignar a creds aquí
         # guardar las credenciales para la próxima ejecución
         with open('token.json', 'w') as token:
@@ -94,28 +96,36 @@ def main():
         raise RuntimeError("Etiqueta no encontrada")
     
     # llamada a la API para obtener los mensajes con la etiqueta
-    results = service.users().messages().list(userId='me', labelIds=[label_id]).execute()
-    messages = results.get('messages', [])
+    next_page_token = ""
+    while True:
+        results = service.users().messages().list(userId='me', labelIds=[label_id],  maxResults=100, pageToken=next_page_token).execute()
+        messages = results.get('messages', [])
 
-    if not messages:
-        print('No se encontraron mensajes.')
-    else:
-        for message in messages:
-            msg = service.users().messages().get(userId='me', id=message['id']).execute()
-            with open(f"{msg['id']}.json", "w") as f:
-                json.dump(msg, f)
-            msg_str = get_message_body(msg)
-            if msg_str:
-                print(msg_str) 
-                headers = get_message_headers(msg)
-                # ignorar mensajes sin publicar
-                if "Google Groups: mensaje pendiente" in headers["Subject"]:
-                    continue
-                email = create_rfc822_message(headers, msg_str)
-                with open(f"{msg['id']}.eml", "w") as f:
-                    f.write(email)
-            else:
-                print(f'No se pudo extraer el cuerpo del mensaje con ID: {message["id"]}')
+        if not messages:
+            print('No se encontraron mensajes.')
+            break
+        else:
+            for message in messages:
+                msg = service.users().messages().get(userId='me', id=message['id']).execute()
+                with open(f"emails/{msg['id']}.json", "w") as f:
+                    json.dump(msg, f)
+                msg_str = get_message_body(msg)
+                if msg_str:
+                    print(msg_str) 
+                    headers = get_message_headers(msg)
+                    # ignorar mensajes sin publicar
+                    if "Google Groups: mensaje pendiente" in headers["Subject"]:
+                        continue
+                    email = create_rfc822_message(headers, msg_str)
+                    with open(f"emails/{msg['id']}.eml", "w") as f:
+                        f.write(email)
+                else:
+                    print(f'No se pudo extraer el cuerpo del mensaje con ID: {message["id"]}')
+
+        if('nextPageToken' in results or next_page_token==''):
+            next_page_token = results['nextPageToken']
+        else:
+            break
 
 
 if __name__ == '__main__':
