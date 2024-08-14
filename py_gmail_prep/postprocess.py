@@ -90,7 +90,7 @@ def parse_gmail(file_path):
             return
 
         # limpiar el cuerpo del mensaje para eliminar el texto citado
-        clean_body = normalize_body(remove_cited_text(msg_str.strip()))
+        clean_body = normalize_body(remove_footer(remove_cited_text(msg_str.strip())))
 
         timestamp = datetime.datetime.fromtimestamp(float(msg['internalDate'])/1000.).strftime('%Y%m%d_%H%M%S')
         filename = f"{timestamp}_{msg['historyId']}_{msg['id']}.eml"
@@ -123,6 +123,25 @@ def remove_cited_text(body):
                 # si se encuentra un marcador, eliminar todo el texto desde esa línea en adelante
                 return '\n'.join(lines[:i])
         prev = line
+
+    # si no se encuentra ningún marcador, devolver el cuerpo tal cual
+    return body
+
+
+def remove_footer(body):
+    # lista de posibles indicadores de pie de pagina
+    footer_markers = [
+        "--", "---", "Saludos", "Sds", "Sds.", "Slds.", "Atte.",
+    ]
+    # dividir el cuerpo en líneas
+    lines = body.splitlines()
+
+    # recorrer las líneas en orden inverso y buscar un marcador de citación
+    for i in reversed(range(len(lines))):
+        line = lines[i].strip()
+        if any(line == marker for marker in footer_markers):
+            # si se encuentra un marcador, eliminar todo el texto desde esa línea en adelante
+            return '\n'.join(lines[:i])
 
     # si no se encuentra ningún marcador, devolver el cuerpo tal cual
     return body
